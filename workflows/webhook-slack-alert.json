@@ -1,0 +1,55 @@
+{
+  "name": "[WEBHOOK] 슬랙 alert 알림",
+  "nodes": [
+    {
+      "id": "n1",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [0, 0],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "alert-slack",
+        "responseMode": "onReceived"
+      }
+    },
+    {
+      "id": "n2",
+      "name": "Slack 채널 생성",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.3,
+      "position": [250, 0],
+      "continueOnFail": true,
+      "parameters": {
+        "authentication": "accessToken",
+        "resource": "channel",
+        "operation": "create",
+        "channelId": "alert",
+        "name": "alert",
+        "channelVisibility": "public"
+      }
+    },
+    {
+      "id": "n3",
+      "name": "Slack 메시지 전송",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.3,
+      "position": [500, 0],
+      "parameters": {
+        "authentication": "accessToken",
+        "resource": "message",
+        "operation": "post",
+        "select": "channel",
+        "channelId": { "__rl": true, "mode": "name", "value": "#alert" },
+        "messageType": "text",
+        "text": "=🚨 *Webhook 알림*\n```{{ JSON.stringify($('Webhook').item.json.body, null, 2) }}```",
+        "otherOptions": {}
+      }
+    }
+  ],
+  "connections": {
+    "Webhook": { "main": [[{ "node": "Slack 채널 생성", "type": "main", "index": 0 }]] },
+    "Slack 채널 생성": { "main": [[{ "node": "Slack 메시지 전송", "type": "main", "index": 0 }]] }
+  },
+  "settings": { "executionOrder": "v1" }
+}
