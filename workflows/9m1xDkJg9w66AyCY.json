@@ -1,0 +1,275 @@
+{
+  "id": "9m1xDkJg9w66AyCY",
+  "name": "[CRON] 매일 9시 학교 시간표 카톡 알림",
+  "active": true,
+  "activeVersionId": "dde752ae-7cd3-499a-839e-b3ff61c689a0",
+  "createdAt": "2026-11-09T11:37:50.341Z",
+  "updatedAt": "2026-11-09T11:37:56.723Z",
+  "isArchived": false,
+  "versionId": "dde752ae-7cd3-499a-839e-b3ff61c689a0",
+  "triggerCount": 2,
+  "nodes": [
+    {
+      "id": "s1",
+      "name": "매일 오전 9시",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 9 * * *"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "s2",
+      "name": "수동 테스트 웹훅",
+      "webhookId": "0a30e8e1-30a8-4f81-90dc-bd2e19b69157",
+      "notes": "테스트용: POST /webhook/timetable-test (body {\"day\":0~6} 로 요일 지정 가능). 필요 없으면 삭제",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        200
+      ],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "timetable-test",
+        "responseMode": "onReceived",
+        "options": {}
+      }
+    },
+    {
+      "id": "s3",
+      "name": "오늘 시간표 생성",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        260,
+        100
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const kst = new Date(Date.now() + 9 * 3600 * 1000);\nconst override = $input.first().json.body?.day;\nconst day = override !== undefined ? Number(override) : kst.getUTCDay();\nconst names = ['일', '월', '화', '수', '목', '금', '토'];\nconst timetable = {\n  1: ['공강 🎉 (수업 없음)'],\n  2: ['10:00~13:00 엑셀', '14:00~17:00 자바스크립트'],\n  3: ['10:00~13:00 웹디자인', '14:00~17:00 파이썬 실무'],\n  4: ['10:00~13:00 인공지능 기본'],\n  5: ['10:00~13:00 융합콘텐츠']\n};\nif (!timetable[day]) return []; // 주말은 발송 안 함\nconst mm = String(kst.getUTCMonth() + 1).padStart(2, '0');\nconst dd = String(kst.getUTCDate()).padStart(2, '0');\nconst text = `📚 ${mm}/${dd}(${names[day]}) 오늘의 시간표\\n` + timetable[day].join('\\n');\nreturn [{ json: { text } }];"
+      }
+    },
+    {
+      "id": "s4",
+      "name": "카카오톡 나에게 전송",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        520,
+        100
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://kapi.kakao.com/v2/api/talk/memo/default/send",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "oAuth2Api",
+        "sendBody": true,
+        "contentType": "form-urlencoded",
+        "specifyBody": "keypair",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "template_object",
+              "value": "={{ JSON.stringify({ object_type: 'text', text: $json.text, link: { web_url: 'https://n8n.io', mobile_web_url: 'https://n8n.io' } }) }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "credentials": {
+        "oAuth2Api": {
+          "id": "cl7OnnERBwPksISb",
+          "name": "Unnamed credential"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "매일 오전 9시": {
+      "main": [
+        [
+          {
+            "node": "오늘 시간표 생성",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "수동 테스트 웹훅": {
+      "main": [
+        [
+          {
+            "node": "오늘 시간표 생성",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "오늘 시간표 생성": {
+      "main": [
+        [
+          {
+            "node": "카카오톡 나에게 전송",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "nodeGroups": [],
+  "settings": {
+    "timezone": "Asia/Seoul",
+    "executionOrder": "v1"
+  },
+  "meta": null,
+  "tags": [],
+  "activeVersion": {
+    "versionId": "dde752ae-7cd3-499a-839e-b3ff61c689a0",
+    "workflowId": "9m1xDkJg9w66AyCY",
+    "nodes": [
+      {
+        "id": "s1",
+        "name": "매일 오전 9시",
+        "type": "n8n-nodes-base.scheduleTrigger",
+        "typeVersion": 1.2,
+        "position": [
+          0,
+          0
+        ],
+        "parameters": {
+          "rule": {
+            "interval": [
+              {
+                "field": "cronExpression",
+                "expression": "0 9 * * *"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "id": "s2",
+        "name": "수동 테스트 웹훅",
+        "webhookId": "0a30e8e1-30a8-4f81-90dc-bd2e19b69157",
+        "notes": "테스트용: POST /webhook/timetable-test (body {\"day\":0~6} 로 요일 지정 가능). 필요 없으면 삭제",
+        "type": "n8n-nodes-base.webhook",
+        "typeVersion": 2,
+        "position": [
+          0,
+          200
+        ],
+        "parameters": {
+          "httpMethod": "POST",
+          "path": "timetable-test",
+          "responseMode": "onReceived",
+          "options": {}
+        }
+      },
+      {
+        "id": "s3",
+        "name": "오늘 시간표 생성",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          260,
+          100
+        ],
+        "parameters": {
+          "mode": "runOnceForAllItems",
+          "jsCode": "const kst = new Date(Date.now() + 9 * 3600 * 1000);\nconst override = $input.first().json.body?.day;\nconst day = override !== undefined ? Number(override) : kst.getUTCDay();\nconst names = ['일', '월', '화', '수', '목', '금', '토'];\nconst timetable = {\n  1: ['공강 🎉 (수업 없음)'],\n  2: ['10:00~13:00 엑셀', '14:00~17:00 자바스크립트'],\n  3: ['10:00~13:00 웹디자인', '14:00~17:00 파이썬 실무'],\n  4: ['10:00~13:00 인공지능 기본'],\n  5: ['10:00~13:00 융합콘텐츠']\n};\nif (!timetable[day]) return []; // 주말은 발송 안 함\nconst mm = String(kst.getUTCMonth() + 1).padStart(2, '0');\nconst dd = String(kst.getUTCDate()).padStart(2, '0');\nconst text = `📚 ${mm}/${dd}(${names[day]}) 오늘의 시간표\\n` + timetable[day].join('\\n');\nreturn [{ json: { text } }];"
+        }
+      },
+      {
+        "id": "s4",
+        "name": "카카오톡 나에게 전송",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          520,
+          100
+        ],
+        "parameters": {
+          "method": "POST",
+          "url": "https://kapi.kakao.com/v2/api/talk/memo/default/send",
+          "authentication": "genericCredentialType",
+          "genericAuthType": "oAuth2Api",
+          "sendBody": true,
+          "contentType": "form-urlencoded",
+          "specifyBody": "keypair",
+          "bodyParameters": {
+            "parameters": [
+              {
+                "name": "template_object",
+                "value": "={{ JSON.stringify({ object_type: 'text', text: $json.text, link: { web_url: 'https://n8n.io', mobile_web_url: 'https://n8n.io' } }) }}"
+              }
+            ]
+          },
+          "options": {}
+        },
+        "credentials": {
+          "oAuth2Api": {
+            "id": "cl7OnnERBwPksISb",
+            "name": "Unnamed credential"
+          }
+        }
+      }
+    ],
+    "connections": {
+      "매일 오전 9시": {
+        "main": [
+          [
+            {
+              "node": "오늘 시간표 생성",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "수동 테스트 웹훅": {
+        "main": [
+          [
+            {
+              "node": "오늘 시간표 생성",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "오늘 시간표 생성": {
+        "main": [
+          [
+            {
+              "node": "카카오톡 나에게 전송",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "nodeGroups": [],
+    "authors": "연지 최",
+    "name": null,
+    "description": null,
+    "autosaved": false,
+    "createdAt": "2026-11-09T11:37:50.352Z",
+    "updatedAt": "2026-11-09T11:37:50.352Z"
+  }
+}
