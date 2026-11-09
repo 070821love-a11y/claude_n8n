@@ -1,0 +1,359 @@
+{
+  "id": "53tS77KJXPKaP3nh",
+  "name": "[CRON] 매일 8시 국내 공모주 카톡 알림",
+  "active": true,
+  "activeVersionId": "5c786ef9-edfb-428c-882f-1e3c1ed60cde",
+  "createdAt": "2026-11-09T11:06:52.866Z",
+  "updatedAt": "2026-11-09T11:06:58.142Z",
+  "isArchived": false,
+  "versionId": "5c786ef9-edfb-428c-882f-1e3c1ed60cde",
+  "triggerCount": 2,
+  "nodes": [
+    {
+      "id": "c1",
+      "name": "매일 오전 8시",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 8 * * *"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "c2",
+      "name": "수동 테스트 웹훅",
+      "webhookId": "b5d8c629-7474-40e5-b886-278bf01228c2",
+      "notes": "테스트용: POST /webhook/ipo-test 호출 시 즉시 발송. 필요 없으면 삭제",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        200
+      ],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "ipo-test",
+        "responseMode": "onReceived",
+        "options": {}
+      }
+    },
+    {
+      "id": "c3",
+      "name": "38커뮤니케이션 청약일정",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        260,
+        100
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "http://www.38.co.kr/html/fund/index.htm?o=k",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "User-Agent",
+              "value": "Mozilla/5.0"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file",
+              "outputPropertyName": "data"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "c4",
+      "name": "공모주 파싱 및 메시지 생성",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        520,
+        100
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const buf = await this.helpers.getBinaryDataBuffer(0, 'data');\nconst html = new TextDecoder('euc-kr').decode(buf);\n\nconst kst = new Date(Date.now() + 9 * 3600 * 1000);\nconst today = Date.UTC(kst.getUTCFullYear(), kst.getUTCMonth(), kst.getUTCDate());\nconst weekEnd = today + 6 * 86400000;\nconst fmt = (t) => { const d = new Date(t); return String(d.getUTCMonth() + 1).padStart(2, '0') + '/' + String(d.getUTCDate()).padStart(2, '0'); };\n\nconst clean = (s) => s.replace(/<[^>]+>/g, '').replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').trim();\nconst all = [];\nfor (const r of html.matchAll(/<tr bgcolor='#[0-9A-Fa-f]+'>([\\s\\S]*?)<\\/tr>/g)) {\n  const c = [...r[1].matchAll(/<td[^>]*>([\\s\\S]*?)<\\/td>/g)].map(m => clean(m[1]));\n  const m = (c[1] || '').match(/(\\d{4})\\.(\\d{2})\\.(\\d{2})~(\\d{2})\\.(\\d{2})/);\n  if (!m) continue;\n  const y = +m[1];\n  const start = Date.UTC(y, +m[2] - 1, +m[3]);\n  const end = Date.UTC(+m[4] < +m[2] ? y + 1 : y, +m[4] - 1, +m[5]);\n  const fixed = c[2] && c[2] !== '-' ? '확정 ' + c[2] : '희망 ' + (c[3] || '-');\n  const rate = c[4] ? ' 경쟁률 ' + c[4] : '';\n  all.push({ name: c[0], start, end, line: `${c[0]} ${fmt(start)}~${fmt(end)} ${fixed}${rate}` });\n}\nall.sort((a, b) => a.start - b.start);\n\nlet picked = all.filter(x => x.end >= today && x.start <= weekEnd);\nlet header = `📈 이번 주 공모주 (${fmt(today)}~${fmt(weekEnd)})`;\nif (picked.length === 0) {\n  picked = all.filter(x => x.start > weekEnd);\n  header = `📈 이번 주 청약 없음 - 다가오는 공모주 (${fmt(today)} 기준)`;\n}\npicked = picked.slice(0, 10);\nif (picked.length === 0) return [{ json: { text: '📈 조회된 공모주 일정이 없습니다.' } }];\n\n// 카카오 text 템플릿은 200자 제한 → 분할\nconst lines = picked.map((x, i) => `${i + 1}. ${x.line}`);\nconst chunks = [];\nlet cur = header;\nfor (const l of lines) {\n  if ((cur + '\\n' + l).length > 190) { chunks.push(cur); cur = l; }\n  else cur += '\\n' + l;\n}\nchunks.push(cur);\nreturn chunks.map(text => ({ json: { text } }));"
+      }
+    },
+    {
+      "id": "c5",
+      "name": "카카오톡 나에게 전송",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        780,
+        100
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://kapi.kakao.com/v2/api/talk/memo/default/send",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "oAuth2Api",
+        "sendBody": true,
+        "contentType": "form-urlencoded",
+        "specifyBody": "keypair",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "template_object",
+              "value": "={{ JSON.stringify({object_type:'text', text: $json.text, link:{web_url:'http://www.38.co.kr/html/fund/index.htm?o=k', mobile_web_url:'http://www.38.co.kr/html/fund/index.htm?o=k'}, button_title:'청약일정 보기'}) }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "credentials": {
+        "oAuth2Api": {
+          "id": "cl7OnnERBwPksISb",
+          "name": "Unnamed credential"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "매일 오전 8시": {
+      "main": [
+        [
+          {
+            "node": "38커뮤니케이션 청약일정",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "수동 테스트 웹훅": {
+      "main": [
+        [
+          {
+            "node": "38커뮤니케이션 청약일정",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "38커뮤니케이션 청약일정": {
+      "main": [
+        [
+          {
+            "node": "공모주 파싱 및 메시지 생성",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "공모주 파싱 및 메시지 생성": {
+      "main": [
+        [
+          {
+            "node": "카카오톡 나에게 전송",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "nodeGroups": [],
+  "settings": {
+    "timezone": "Asia/Seoul",
+    "executionOrder": "v1"
+  },
+  "meta": null,
+  "tags": [],
+  "activeVersion": {
+    "versionId": "5c786ef9-edfb-428c-882f-1e3c1ed60cde",
+    "workflowId": "53tS77KJXPKaP3nh",
+    "nodes": [
+      {
+        "id": "c1",
+        "name": "매일 오전 8시",
+        "type": "n8n-nodes-base.scheduleTrigger",
+        "typeVersion": 1.2,
+        "position": [
+          0,
+          0
+        ],
+        "parameters": {
+          "rule": {
+            "interval": [
+              {
+                "field": "cronExpression",
+                "expression": "0 8 * * *"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "id": "c2",
+        "name": "수동 테스트 웹훅",
+        "webhookId": "b5d8c629-7474-40e5-b886-278bf01228c2",
+        "notes": "테스트용: POST /webhook/ipo-test 호출 시 즉시 발송. 필요 없으면 삭제",
+        "type": "n8n-nodes-base.webhook",
+        "typeVersion": 2,
+        "position": [
+          0,
+          200
+        ],
+        "parameters": {
+          "httpMethod": "POST",
+          "path": "ipo-test",
+          "responseMode": "onReceived",
+          "options": {}
+        }
+      },
+      {
+        "id": "c3",
+        "name": "38커뮤니케이션 청약일정",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          260,
+          100
+        ],
+        "parameters": {
+          "method": "GET",
+          "url": "http://www.38.co.kr/html/fund/index.htm?o=k",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "User-Agent",
+                "value": "Mozilla/5.0"
+              }
+            ]
+          },
+          "options": {
+            "response": {
+              "response": {
+                "responseFormat": "file",
+                "outputPropertyName": "data"
+              }
+            }
+          }
+        }
+      },
+      {
+        "id": "c4",
+        "name": "공모주 파싱 및 메시지 생성",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          520,
+          100
+        ],
+        "parameters": {
+          "mode": "runOnceForAllItems",
+          "jsCode": "const buf = await this.helpers.getBinaryDataBuffer(0, 'data');\nconst html = new TextDecoder('euc-kr').decode(buf);\n\nconst kst = new Date(Date.now() + 9 * 3600 * 1000);\nconst today = Date.UTC(kst.getUTCFullYear(), kst.getUTCMonth(), kst.getUTCDate());\nconst weekEnd = today + 6 * 86400000;\nconst fmt = (t) => { const d = new Date(t); return String(d.getUTCMonth() + 1).padStart(2, '0') + '/' + String(d.getUTCDate()).padStart(2, '0'); };\n\nconst clean = (s) => s.replace(/<[^>]+>/g, '').replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').trim();\nconst all = [];\nfor (const r of html.matchAll(/<tr bgcolor='#[0-9A-Fa-f]+'>([\\s\\S]*?)<\\/tr>/g)) {\n  const c = [...r[1].matchAll(/<td[^>]*>([\\s\\S]*?)<\\/td>/g)].map(m => clean(m[1]));\n  const m = (c[1] || '').match(/(\\d{4})\\.(\\d{2})\\.(\\d{2})~(\\d{2})\\.(\\d{2})/);\n  if (!m) continue;\n  const y = +m[1];\n  const start = Date.UTC(y, +m[2] - 1, +m[3]);\n  const end = Date.UTC(+m[4] < +m[2] ? y + 1 : y, +m[4] - 1, +m[5]);\n  const fixed = c[2] && c[2] !== '-' ? '확정 ' + c[2] : '희망 ' + (c[3] || '-');\n  const rate = c[4] ? ' 경쟁률 ' + c[4] : '';\n  all.push({ name: c[0], start, end, line: `${c[0]} ${fmt(start)}~${fmt(end)} ${fixed}${rate}` });\n}\nall.sort((a, b) => a.start - b.start);\n\nlet picked = all.filter(x => x.end >= today && x.start <= weekEnd);\nlet header = `📈 이번 주 공모주 (${fmt(today)}~${fmt(weekEnd)})`;\nif (picked.length === 0) {\n  picked = all.filter(x => x.start > weekEnd);\n  header = `📈 이번 주 청약 없음 - 다가오는 공모주 (${fmt(today)} 기준)`;\n}\npicked = picked.slice(0, 10);\nif (picked.length === 0) return [{ json: { text: '📈 조회된 공모주 일정이 없습니다.' } }];\n\n// 카카오 text 템플릿은 200자 제한 → 분할\nconst lines = picked.map((x, i) => `${i + 1}. ${x.line}`);\nconst chunks = [];\nlet cur = header;\nfor (const l of lines) {\n  if ((cur + '\\n' + l).length > 190) { chunks.push(cur); cur = l; }\n  else cur += '\\n' + l;\n}\nchunks.push(cur);\nreturn chunks.map(text => ({ json: { text } }));"
+        }
+      },
+      {
+        "id": "c5",
+        "name": "카카오톡 나에게 전송",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          780,
+          100
+        ],
+        "parameters": {
+          "method": "POST",
+          "url": "https://kapi.kakao.com/v2/api/talk/memo/default/send",
+          "authentication": "genericCredentialType",
+          "genericAuthType": "oAuth2Api",
+          "sendBody": true,
+          "contentType": "form-urlencoded",
+          "specifyBody": "keypair",
+          "bodyParameters": {
+            "parameters": [
+              {
+                "name": "template_object",
+                "value": "={{ JSON.stringify({object_type:'text', text: $json.text, link:{web_url:'http://www.38.co.kr/html/fund/index.htm?o=k', mobile_web_url:'http://www.38.co.kr/html/fund/index.htm?o=k'}, button_title:'청약일정 보기'}) }}"
+              }
+            ]
+          },
+          "options": {}
+        },
+        "credentials": {
+          "oAuth2Api": {
+            "id": "cl7OnnERBwPksISb",
+            "name": "Unnamed credential"
+          }
+        }
+      }
+    ],
+    "connections": {
+      "매일 오전 8시": {
+        "main": [
+          [
+            {
+              "node": "38커뮤니케이션 청약일정",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "수동 테스트 웹훅": {
+        "main": [
+          [
+            {
+              "node": "38커뮤니케이션 청약일정",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "38커뮤니케이션 청약일정": {
+        "main": [
+          [
+            {
+              "node": "공모주 파싱 및 메시지 생성",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "공모주 파싱 및 메시지 생성": {
+        "main": [
+          [
+            {
+              "node": "카카오톡 나에게 전송",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "nodeGroups": [],
+    "authors": "연지 최",
+    "name": null,
+    "description": null,
+    "autosaved": false,
+    "createdAt": "2026-11-09T11:06:52.876Z",
+    "updatedAt": "2026-11-09T11:06:52.876Z"
+  }
+}
