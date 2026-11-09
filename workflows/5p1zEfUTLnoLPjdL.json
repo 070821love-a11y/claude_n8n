@@ -1,0 +1,225 @@
+{
+  "id": "5p1zEfUTLnoLPjdL",
+  "name": "[WEBHOOK] 카카오톡 캘린더 할일 등록",
+  "active": true,
+  "activeVersionId": "ab9772ce-d4c1-4513-8944-b402bd30a2ca",
+  "createdAt": "2026-11-09T11:17:20.901Z",
+  "updatedAt": "2026-11-09T11:17:40.658Z",
+  "isArchived": false,
+  "versionId": "ab9772ce-d4c1-4513-8944-b402bd30a2ca",
+  "triggerCount": 1,
+  "nodes": [
+    {
+      "id": "t1",
+      "name": "Webhook",
+      "webhookId": "d23b224c-6ebc-48d5-a934-a8b1580ebd6d",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "kakao-todo",
+        "responseMode": "responseNode",
+        "options": {}
+      }
+    },
+    {
+      "id": "t2",
+      "name": "카카오 할일 등록",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        240,
+        0
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://kapi.kakao.com/v1/api/calendar/create/task",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "oAuth2Api",
+        "sendBody": true,
+        "contentType": "form-urlencoded",
+        "specifyBody": "keypair",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "task",
+              "value": "={{ JSON.stringify({ content: $json.body.content || '빼빼로 선물', due_info: { due_date: $json.body.due_date || '20261111', time_zone: 'Asia/Seoul' } }) }}"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        }
+      },
+      "credentials": {
+        "oAuth2Api": {
+          "id": "cl7OnnERBwPksISb",
+          "name": "Unnamed credential"
+        }
+      }
+    },
+    {
+      "id": "t3",
+      "name": "응답",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        480,
+        0
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {}
+      }
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "카카오 할일 등록",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "카카오 할일 등록": {
+      "main": [
+        [
+          {
+            "node": "응답",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "nodeGroups": [],
+  "settings": {
+    "timezone": "Asia/Seoul",
+    "executionOrder": "v1"
+  },
+  "meta": null,
+  "tags": [],
+  "activeVersion": {
+    "versionId": "ab9772ce-d4c1-4513-8944-b402bd30a2ca",
+    "workflowId": "5p1zEfUTLnoLPjdL",
+    "nodes": [
+      {
+        "id": "t1",
+        "name": "Webhook",
+        "webhookId": "d23b224c-6ebc-48d5-a934-a8b1580ebd6d",
+        "type": "n8n-nodes-base.webhook",
+        "typeVersion": 2,
+        "position": [
+          0,
+          0
+        ],
+        "parameters": {
+          "httpMethod": "POST",
+          "path": "kakao-todo",
+          "responseMode": "responseNode",
+          "options": {}
+        }
+      },
+      {
+        "id": "t2",
+        "name": "카카오 할일 등록",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          240,
+          0
+        ],
+        "parameters": {
+          "method": "POST",
+          "url": "https://kapi.kakao.com/v1/api/calendar/create/task",
+          "authentication": "genericCredentialType",
+          "genericAuthType": "oAuth2Api",
+          "sendBody": true,
+          "contentType": "form-urlencoded",
+          "specifyBody": "keypair",
+          "bodyParameters": {
+            "parameters": [
+              {
+                "name": "task",
+                "value": "={{ JSON.stringify({ content: $json.body.content || '빼빼로 선물', due_info: { due_date: $json.body.due_date || '20261111', time_zone: 'Asia/Seoul' } }) }}"
+              }
+            ]
+          },
+          "options": {
+            "response": {
+              "response": {
+                "neverError": true
+              }
+            }
+          }
+        },
+        "credentials": {
+          "oAuth2Api": {
+            "id": "cl7OnnERBwPksISb",
+            "name": "Unnamed credential"
+          }
+        }
+      },
+      {
+        "id": "t3",
+        "name": "응답",
+        "type": "n8n-nodes-base.respondToWebhook",
+        "typeVersion": 1.1,
+        "position": [
+          480,
+          0
+        ],
+        "parameters": {
+          "respondWith": "json",
+          "responseBody": "={{ $json }}",
+          "options": {}
+        }
+      }
+    ],
+    "connections": {
+      "Webhook": {
+        "main": [
+          [
+            {
+              "node": "카카오 할일 등록",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "카카오 할일 등록": {
+        "main": [
+          [
+            {
+              "node": "응답",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "nodeGroups": [],
+    "authors": "연지 최",
+    "name": null,
+    "description": null,
+    "autosaved": false,
+    "createdAt": "2026-11-09T11:17:40.659Z",
+    "updatedAt": "2026-11-09T11:17:40.659Z"
+  }
+}
