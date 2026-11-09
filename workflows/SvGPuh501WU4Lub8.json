@@ -1,0 +1,223 @@
+{
+  "id": "SvGPuh501WU4Lub8",
+  "name": "[WEBHOOK] 카카오톡 나에게 보내기",
+  "active": true,
+  "activeVersionId": "5830796a-6731-4891-b443-d88a93c0552c",
+  "createdAt": "2026-11-09T10:29:31.345Z",
+  "updatedAt": "2026-11-09T10:54:22.157Z",
+  "isArchived": false,
+  "versionId": "5830796a-6731-4891-b443-d88a93c0552c",
+  "triggerCount": 1,
+  "nodes": [
+    {
+      "id": "n1",
+      "name": "Webhook",
+      "webhookId": "397201d4-196a-44ff-969d-708dd61a372b",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "kakao-notify",
+        "responseMode": "responseNode",
+        "options": {}
+      }
+    },
+    {
+      "id": "n4",
+      "name": "카카오톡 나에게 전송",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        224,
+        0
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://kapi.kakao.com/v2/api/talk/memo/default/send",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "oAuth2Api",
+        "sendHeaders": false,
+        "headerParameters": {
+          "parameters": []
+        },
+        "sendBody": true,
+        "contentType": "form-urlencoded",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "template_object",
+              "value": "={{ JSON.stringify({object_type:'text', text: $('Webhook').item.json.body.message || $('Webhook').item.json.query.message || 'n8n 알림', link:{web_url: $('Webhook').item.json.body.link || 'https://n8n.io', mobile_web_url: $('Webhook').item.json.body.link || 'https://n8n.io'}, button_title:'열기'}) }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "credentials": {
+        "oAuth2Api": {
+          "id": "cl7OnnERBwPksISb",
+          "name": "Unnamed credential"
+        }
+      }
+    },
+    {
+      "id": "n5",
+      "name": "응답",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        448,
+        0
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { ok: $json.result_code === 0, result: $json } }}",
+        "options": {}
+      }
+    }
+  ],
+  "connections": {
+    "카카오톡 나에게 전송": {
+      "main": [
+        [
+          {
+            "node": "응답",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "카카오톡 나에게 전송",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "nodeGroups": [],
+  "settings": {
+    "saveExecutionProgress": true,
+    "saveManualExecutions": true,
+    "saveDataErrorExecution": "all",
+    "saveDataSuccessExecution": "all",
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "meta": null,
+  "tags": [],
+  "activeVersion": {
+    "versionId": "5830796a-6731-4891-b443-d88a93c0552c",
+    "workflowId": "SvGPuh501WU4Lub8",
+    "nodes": [
+      {
+        "id": "n1",
+        "name": "Webhook",
+        "webhookId": "397201d4-196a-44ff-969d-708dd61a372b",
+        "type": "n8n-nodes-base.webhook",
+        "typeVersion": 2,
+        "position": [
+          0,
+          0
+        ],
+        "parameters": {
+          "httpMethod": "POST",
+          "path": "kakao-notify",
+          "responseMode": "responseNode",
+          "options": {}
+        }
+      },
+      {
+        "id": "n4",
+        "name": "카카오톡 나에게 전송",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          224,
+          0
+        ],
+        "parameters": {
+          "method": "POST",
+          "url": "https://kapi.kakao.com/v2/api/talk/memo/default/send",
+          "authentication": "genericCredentialType",
+          "genericAuthType": "oAuth2Api",
+          "sendHeaders": false,
+          "headerParameters": {
+            "parameters": []
+          },
+          "sendBody": true,
+          "contentType": "form-urlencoded",
+          "bodyParameters": {
+            "parameters": [
+              {
+                "name": "template_object",
+                "value": "={{ JSON.stringify({object_type:'text', text: $('Webhook').item.json.body.message || $('Webhook').item.json.query.message || 'n8n 알림', link:{web_url: $('Webhook').item.json.body.link || 'https://n8n.io', mobile_web_url: $('Webhook').item.json.body.link || 'https://n8n.io'}, button_title:'열기'}) }}"
+              }
+            ]
+          },
+          "options": {}
+        },
+        "credentials": {
+          "oAuth2Api": {
+            "id": "cl7OnnERBwPksISb",
+            "name": "Unnamed credential"
+          }
+        }
+      },
+      {
+        "id": "n5",
+        "name": "응답",
+        "type": "n8n-nodes-base.respondToWebhook",
+        "typeVersion": 1.1,
+        "position": [
+          448,
+          0
+        ],
+        "parameters": {
+          "respondWith": "json",
+          "responseBody": "={{ { ok: $json.result_code === 0, result: $json } }}",
+          "options": {}
+        }
+      }
+    ],
+    "connections": {
+      "카카오톡 나에게 전송": {
+        "main": [
+          [
+            {
+              "node": "응답",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Webhook": {
+        "main": [
+          [
+            {
+              "node": "카카오톡 나에게 전송",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "nodeGroups": [],
+    "authors": "연지 최",
+    "name": null,
+    "description": null,
+    "autosaved": false,
+    "createdAt": "2026-11-09T10:54:14.224Z",
+    "updatedAt": "2026-11-09T10:54:14.224Z"
+  }
+}
