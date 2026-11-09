@@ -1,0 +1,81 @@
+{
+  "id": "PBVY2RHApiilJPsp",
+  "name": "[WEBHOOK] 슬랙 alert 알림",
+  "active": false,
+  "activeVersionId": null,
+  "createdAt": "2026-11-04T12:22:38.537Z",
+  "updatedAt": "2026-11-06T12:50:02.490Z",
+  "isArchived": false,
+  "versionId": "fa8eea96-525d-4f98-8893-ad44cedac722",
+  "triggerCount": 1,
+  "nodes": [
+    {
+      "id": "n1",
+      "name": "Webhook",
+      "webhookId": "6434a52e-bbc3-4620-a92a-46240c588489",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "alert-slack",
+        "options": {}
+      }
+    },
+    {
+      "id": "n3",
+      "name": "Slack 메시지 전송",
+      "webhookId": "894ae40a-111b-4f97-923a-1d065c709705",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.3,
+      "position": [
+        512,
+        0
+      ],
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "mode": "name",
+          "value": "#alert"
+        },
+        "text": "📰 *뉴스 헤드라인 5선 (11/3 기준 보도)*\n1. 2026 미국 중간선거 투표 시작 - 오하이오 주지사 선거 주목, 선거일 휘발유 가격 사상 최고치\n2. 미군, 이란 케슘섬 공습\n3. 9월 소비자물가 3.7% 상승 - 경유 가격 급등 영향\n4. 미 연방대법원, 기후변화 관련 주요 사건으로 이번 개정기 시작\n5. 스페인, 올해 두 번째 치명적 열차 사고 발생",
+        "otherOptions": {}
+      },
+      "credentials": {
+        "slackApi": {
+          "id": "pA3C8oOTJX7s1rOh",
+          "name": "Slack account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Slack 메시지 전송",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "nodeGroups": [],
+  "settings": {
+    "saveExecutionProgress": true,
+    "saveManualExecutions": true,
+    "saveDataErrorExecution": "all",
+    "saveDataSuccessExecution": "all",
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "meta": null,
+  "tags": [],
+  "activeVersion": null
+}
