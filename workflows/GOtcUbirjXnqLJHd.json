@@ -1,0 +1,299 @@
+{
+  "id": "GOtcUbirjXnqLJHd",
+  "name": "멜론 차트 크롤링 → 구글 시트 정리 (Firecrawl)",
+  "active": false,
+  "activeVersionId": null,
+  "createdAt": "2026-11-06T12:17:04.315Z",
+  "updatedAt": "2026-11-06T12:35:27.536Z",
+  "isArchived": false,
+  "versionId": "ad41de58-5dc4-4f02-bc73-e4695fb5ee23",
+  "triggerCount": 0,
+  "nodes": [
+    {
+      "id": "n1",
+      "name": "수동 실행",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "n2",
+      "name": "매일 오전 9시",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        208
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 9 * * *"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "n3",
+      "name": "Firecrawl 멜론 차트 크롤링",
+      "notes": "Firecrawl API Key를 Header Auth 크리덴셜로 등록 (Name: Authorization, Value: Bearer fc-xxxx)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        272,
+        112
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.firecrawl.dev/v1/scrape",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ url: 'https://www.melon.com/chart/index.htm', formats: ['rawHtml'], waitFor: 2000 }) }}",
+        "options": {
+          "timeout": 120000
+        }
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "RpgRHPccAbeYUcEL",
+          "name": "Header Auth account"
+        }
+      }
+    },
+    {
+      "id": "n4",
+      "name": "순위/곡명/가수 추출",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        528,
+        112
+      ],
+      "parameters": {
+        "jsCode": "const html = $input.first().json.data?.rawHtml || '';\nconst dec = s => (s || '').replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&quot;/g,'\"').replace(/&#0?39;/g,\"'\").trim();\nconst parts = html.split(/<tr[^>]*data-song-no=/).slice(1);\nconst songs = [];\nfor (const p of parts) {\n  const id = (p.match(/^\\\"?(\\d+)/) || [])[1];\n  const rank = (p.match(/<span class=\\\"rank[^\\\"]*\\\">\\s*(\\d+)\\s*<\\/span>/) || [])[1];\n  const title = (p.match(/rank01[\\s\\S]*?<a [^>]*>([^<]+)<\\/a>/) || [])[1];\n  const artist = (p.match(/rank02[\\s\\S]*?<a [^>]*>([^<]+)<\\/a>/) || [])[1];\n  if (id && rank && title) songs.push({ songId: id, rank: Number(rank), title: dec(title), artist: dec(artist) });\n}\nif (!songs.length) throw new Error('차트 데이터를 파싱하지 못했습니다. Firecrawl 응답을 확인하세요.');\nreturn [{ json: { songs, ids: songs.map(s => s.songId).join(',') } }];"
+      }
+    },
+    {
+      "id": "n5",
+      "name": "좋아요 수 조회",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        784,
+        112
+      ],
+      "parameters": {
+        "url": "https://www.melon.com/commonlike/getSongLike.json",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "contsIds",
+              "value": "={{ $json.ids }}"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Referer",
+              "value": "https://www.melon.com/chart/index.htm"
+            },
+            {
+              "name": "User-Agent",
+              "value": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124.0 Safari/537.36"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "n6",
+      "name": "데이터 병합",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1040,
+        112
+      ],
+      "parameters": {
+        "jsCode": "const songs = $('순위/곡명/가수 추출').first().json.songs;\nconst res = $input.first().json;\nconst list = res.contsLikeInfoList || [];\nconst likeMap = {};\nfor (const l of list) likeMap[String(l.CONTSID)] = l.SUMMCNT;\nconst now = new Date().toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' });\nreturn songs.map(s => ({ json: {\n  '순위': s.rank,\n  '곡제목': s.title,\n  '가수': s.artist,\n  '좋아요수': likeMap[s.songId] ?? 0,\n  '수집시각': now\n}}));"
+      }
+    },
+    {
+      "id": "n7",
+      "name": "구글 시트에 저장",
+      "notes": "시트 1행에 헤더: 순위 | 곡제목 | 가수 | 좋아요수 | 수집시각",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1312,
+        112
+      ],
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1pNVHiKxwKth68YvGtilKgv_2mhjfk5n5jWSyUeozQKE",
+          "mode": "list",
+          "cachedResultName": "멜론 차트",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1pNVHiKxwKth68YvGtilKgv_2mhjfk5n5jWSyUeozQKE/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "시트1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1pNVHiKxwKth68YvGtilKgv_2mhjfk5n5jWSyUeozQKE/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "순위": "={{ $json['순위'] }}",
+            "곡제목": "={{ $json['곡제목'] }}",
+            "가수": "={{ $json['가수'] }}",
+            "좋아요수": "={{ $json['좋아요수'] }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "순위",
+              "displayName": "순위",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "곡제목",
+              "displayName": "곡제목",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "가수",
+              "displayName": "가수",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "좋아요수",
+              "displayName": "좋아요수",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "dnfu962xMOBcZMJU",
+          "name": "Google Sheets account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "수동 실행": {
+      "main": [
+        [
+          {
+            "node": "Firecrawl 멜론 차트 크롤링",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "매일 오전 9시": {
+      "main": [
+        [
+          {
+            "node": "Firecrawl 멜론 차트 크롤링",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Firecrawl 멜론 차트 크롤링": {
+      "main": [
+        [
+          {
+            "node": "순위/곡명/가수 추출",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "순위/곡명/가수 추출": {
+      "main": [
+        [
+          {
+            "node": "좋아요 수 조회",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "좋아요 수 조회": {
+      "main": [
+        [
+          {
+            "node": "데이터 병합",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "데이터 병합": {
+      "main": [
+        [
+          {
+            "node": "구글 시트에 저장",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "nodeGroups": [],
+  "settings": {
+    "timezone": "Asia/Seoul",
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "tags": [],
+  "activeVersion": null
+}
