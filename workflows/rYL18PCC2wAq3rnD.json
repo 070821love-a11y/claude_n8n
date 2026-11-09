@@ -1,0 +1,127 @@
+{
+  "id": "rYL18PCC2wAq3rnD",
+  "name": "좋은 글귀 생성기",
+  "active": false,
+  "activeVersionId": null,
+  "createdAt": "2026-11-04T11:17:04.468Z",
+  "updatedAt": "2026-11-06T12:50:02.733Z",
+  "isArchived": false,
+  "versionId": "8944aed5-9bd4-4d21-b5b4-f2ff8adbcd9f",
+  "triggerCount": 1,
+  "nodes": [
+    {
+      "id": "trigger-1",
+      "name": "트리거",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "code-1",
+      "name": "좋은 글귀 생성",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        240,
+        0
+      ],
+      "parameters": {
+        "jsCode": "const quotes = [\n  '천 리 길도 한 걸음부터 시작된다.',\n  '오늘 걷지 않으면 내일은 뛰어야 한다.',\n  '실패는 포기하는 순간에만 실패다.',\n  '작은 습관이 큰 변화를 만든다.',\n  '가장 어두운 밤도 결국 끝나고 해는 뜬다.',\n  '지금 이 순간이 당신의 가장 젊은 날이다.',\n  '꿈을 이루는 힘은 매일의 꾸준함에서 나온다.',\n  '느려도 괜찮다, 멈추지만 않으면 된다.',\n  '어제보다 나은 오늘이면 충분하다.',\n  '시작이 반이다.'\n];\nconst quote = quotes[Math.floor(Math.random() * quotes.length)];\nreturn [{ json: { quote, createdAt: new Date().toISOString() } }];"
+      }
+    },
+    {
+      "id": "webhook-1",
+      "name": "웹훅 트리거",
+      "webhookId": "5111d7e1-235f-4277-a850-69a1ebebf19b",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        208
+      ],
+      "parameters": {
+        "path": "good-quote",
+        "responseMode": "lastNode",
+        "options": {}
+      }
+    },
+    {
+      "id": "http-1",
+      "name": "웹훅 호출",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        240,
+        -208
+      ],
+      "parameters": {
+        "url": "http://localhost:5678/webhook/good-quote",
+        "options": {}
+      }
+    },
+    {
+      "id": "log-1",
+      "name": "콘솔 출력",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        512,
+        -208
+      ],
+      "parameters": {
+        "jsCode": "const { quote, createdAt } = $input.first().json;\nconsole.log(`[좋은 글귀] ${quote} (${createdAt})`);\nreturn [{ json: { logged: true, quote, createdAt } }];"
+      }
+    }
+  ],
+  "connections": {
+    "웹훅 트리거": {
+      "main": [
+        [
+          {
+            "node": "좋은 글귀 생성",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "트리거": {
+      "main": [
+        [
+          {
+            "node": "웹훅 호출",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "웹훅 호출": {
+      "main": [
+        [
+          {
+            "node": "콘솔 출력",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "nodeGroups": [],
+  "settings": {
+    "saveExecutionProgress": true,
+    "saveManualExecutions": true,
+    "saveDataErrorExecution": "all",
+    "saveDataSuccessExecution": "all",
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "meta": null,
+  "tags": [],
+  "activeVersion": null
+}
