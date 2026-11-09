@@ -1,0 +1,617 @@
+{
+  "id": "0JjFF0lYAEr1g6hz",
+  "name": "[CRON] 매일 17시 워크플로우 GitHub 백업",
+  "active": true,
+  "activeVersionId": "06981686-a409-4d46-b86d-bdfba1904626",
+  "createdAt": "2026-11-09T11:59:23.943Z",
+  "updatedAt": "2026-11-09T12:31:22.629Z",
+  "isArchived": false,
+  "versionId": "78896ab5-9fbc-40dc-be66-cc149fabe8c2",
+  "triggerCount": 2,
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 17 * * *"
+            }
+          ]
+        }
+      },
+      "id": "g1",
+      "name": "매일 오후 5시",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "backup-test",
+        "options": {}
+      },
+      "id": "g8",
+      "name": "수동 실행 웹훅",
+      "webhookId": "dbe24fa2-04ab-43b7-89e9-32f0508e9302",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        208
+      ],
+      "notes": "테스트용: POST /webhook/backup-test 호출 시 즉시 백업. 필요 없으면 삭제"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "a1",
+              "name": "owner",
+              "value": "070821love-a11y",
+              "type": "string"
+            },
+            {
+              "id": "a2",
+              "name": "repo",
+              "value": "claude_n8n",
+              "type": "string"
+            },
+            {
+              "id": "a3",
+              "name": "branch",
+              "value": "main",
+              "type": "string"
+            },
+            {
+              "id": "a4",
+              "name": "folder",
+              "value": "workflows",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "g2",
+      "name": "설정",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        240,
+        112
+      ],
+      "notes": "백업 대상: https://github.com/070821love-a11y/claude_n8n"
+    },
+    {
+      "parameters": {
+        "jsCode": "const cfg = $('설정').first().json;\nreturn $input.all().map(i => {\n  const wf = { ...i.json };\n  // 민감할 수 있는 실행 시 데이터는 백업에서 제외\n  delete wf.staticData; delete wf.pinData; delete wf.shared;\n  const text = JSON.stringify(wf, null, 2) + '\\n';\n  return { json: {\n    path: `${cfg.folder}/${wf.id}.json`,\n    name: wf.name,\n    content: Buffer.from(text, 'utf8').toString('base64')\n  } };\n});"
+      },
+      "id": "g4",
+      "name": "파일 생성",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        688,
+        112
+      ]
+    },
+    {
+      "parameters": {
+        "url": "=https://api.github.com/repos/{{ $('설정').first().json.owner }}/{{ $('설정').first().json.repo }}/contents/{{ $json.path }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "githubApi",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "ref",
+              "value": "={{ $('설정').first().json.branch }}"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Accept",
+              "value": "application/vnd.github+json"
+            },
+            {
+              "name": "X-GitHub-Api-Version",
+              "value": "2022-11-28"
+            },
+            {
+              "name": "User-Agent",
+              "value": "n8n-backup"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        }
+      },
+      "id": "g5",
+      "name": "GitHub 기존 파일 조회",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        912,
+        112
+      ],
+      "credentials": {
+        "githubApi": {
+          "id": "eBVkFpyweKY4ZBJT",
+          "name": "GitHub account"
+        }
+      },
+      "notes": "404(신규 파일/빈 저장소)는 정상 → neverError"
+    },
+    {
+      "parameters": {
+        "jsCode": "const files = $('파일 생성').all();\nconst out = [];\n$input.all().forEach((r, i) => {\n  const f = files[i].json;\n  const ex = r.json;\n  const exists = !!(ex && ex.sha && ex.content);\n  if (exists && String(ex.content).replace(/\\n/g, '') === f.content) return; // 변경 없음 → 스킵\n  // branch 미지정 = 기본 브랜치 (빈 저장소에서도 동작)\n  const body = {\n    message: `backup: ${f.name} (${new Date().toISOString().slice(0, 10)})`,\n    content: f.content\n  };\n  if (exists) body.sha = ex.sha;\n  out.push({ json: { path: f.path, body } });\n});\nreturn out;"
+      },
+      "id": "g6",
+      "name": "변경 여부 확인",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1120,
+        112
+      ]
+    },
+    {
+      "parameters": {
+        "method": "PUT",
+        "url": "=https://api.github.com/repos/{{ $('설정').first().json.owner }}/{{ $('설정').first().json.repo }}/contents/{{ $json.path }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "githubApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Accept",
+              "value": "application/vnd.github+json"
+            },
+            {
+              "name": "X-GitHub-Api-Version",
+              "value": "2022-11-28"
+            },
+            {
+              "name": "User-Agent",
+              "value": "n8n-backup"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.body) }}",
+        "options": {}
+      },
+      "id": "g7",
+      "name": "GitHub 파일 저장",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1296,
+        112
+      ],
+      "credentials": {
+        "githubApi": {
+          "id": "eBVkFpyweKY4ZBJT",
+          "name": "GitHub account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "매일 오후 5시": {
+      "main": [
+        [
+          {
+            "node": "설정",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "수동 실행 웹훅": {
+      "main": [
+        [
+          {
+            "node": "설정",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "설정": {
+      "main": [
+        [
+          {
+            "node": "파일 생성",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "파일 생성": {
+      "main": [
+        [
+          {
+            "node": "GitHub 기존 파일 조회",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GitHub 기존 파일 조회": {
+      "main": [
+        [
+          {
+            "node": "변경 여부 확인",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "변경 여부 확인": {
+      "main": [
+        [
+          {
+            "node": "GitHub 파일 저장",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "nodeGroups": [],
+  "settings": {
+    "timezone": "Asia/Seoul",
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "tags": [],
+  "activeVersion": {
+    "versionId": "06981686-a409-4d46-b86d-bdfba1904626",
+    "workflowId": "0JjFF0lYAEr1g6hz",
+    "nodes": [
+      {
+        "id": "g1",
+        "name": "매일 오후 5시",
+        "type": "n8n-nodes-base.scheduleTrigger",
+        "typeVersion": 1.2,
+        "position": [
+          0,
+          0
+        ],
+        "parameters": {
+          "rule": {
+            "interval": [
+              {
+                "field": "cronExpression",
+                "expression": "0 17 * * *"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "id": "g8",
+        "name": "수동 실행 웹훅",
+        "webhookId": "dbe24fa2-04ab-43b7-89e9-32f0508e9302",
+        "notes": "테스트용: POST /webhook/backup-test 호출 시 즉시 백업. 필요 없으면 삭제",
+        "type": "n8n-nodes-base.webhook",
+        "typeVersion": 2,
+        "position": [
+          0,
+          200
+        ],
+        "parameters": {
+          "httpMethod": "POST",
+          "path": "backup-test",
+          "responseMode": "onReceived",
+          "options": {}
+        }
+      },
+      {
+        "id": "g2",
+        "name": "설정",
+        "notes": "백업 대상: https://github.com/070821love-a11y/claude_n8n",
+        "type": "n8n-nodes-base.set",
+        "typeVersion": 3.4,
+        "position": [
+          240,
+          100
+        ],
+        "parameters": {
+          "assignments": {
+            "assignments": [
+              {
+                "id": "a1",
+                "name": "owner",
+                "value": "070821love-a11y",
+                "type": "string"
+              },
+              {
+                "id": "a2",
+                "name": "repo",
+                "value": "claude_n8n",
+                "type": "string"
+              },
+              {
+                "id": "a3",
+                "name": "branch",
+                "value": "main",
+                "type": "string"
+              },
+              {
+                "id": "a4",
+                "name": "folder",
+                "value": "workflows",
+                "type": "string"
+              }
+            ]
+          },
+          "options": {}
+        }
+      },
+      {
+        "id": "g3",
+        "name": "n8n 워크플로우 전체 조회",
+        "type": "n8n-nodes-base.n8n",
+        "typeVersion": 1,
+        "position": [
+          460,
+          100
+        ],
+        "parameters": {
+          "resource": "workflow",
+          "operation": "getAll",
+          "returnAll": true,
+          "filters": {},
+          "requestOptions": {}
+        },
+        "credentials": {
+          "n8nApi": {
+            "id": "3D7OO56Ofl3qO8gk",
+            "name": "n8n account"
+          }
+        }
+      },
+      {
+        "id": "g4",
+        "name": "파일 생성",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          680,
+          100
+        ],
+        "parameters": {
+          "mode": "runOnceForAllItems",
+          "jsCode": "const cfg = $('설정').first().json;\nreturn $input.all().map(i => {\n  const wf = { ...i.json };\n  // 민감할 수 있는 실행 시 데이터는 백업에서 제외\n  delete wf.staticData; delete wf.pinData; delete wf.shared;\n  const text = JSON.stringify(wf, null, 2) + '\\n';\n  return { json: {\n    path: `${cfg.folder}/${wf.id}.json`,\n    name: wf.name,\n    content: Buffer.from(text, 'utf8').toString('base64')\n  } };\n});"
+        }
+      },
+      {
+        "id": "g5",
+        "name": "GitHub 기존 파일 조회",
+        "notes": "404(신규 파일/빈 저장소)는 정상 → neverError",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          900,
+          100
+        ],
+        "parameters": {
+          "method": "GET",
+          "url": "=https://api.github.com/repos/{{ $('설정').first().json.owner }}/{{ $('설정').first().json.repo }}/contents/{{ $json.path }}",
+          "authentication": "predefinedCredentialType",
+          "nodeCredentialType": "githubApi",
+          "sendQuery": true,
+          "queryParameters": {
+            "parameters": [
+              {
+                "name": "ref",
+                "value": "={{ $('설정').first().json.branch }}"
+              }
+            ]
+          },
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "Accept",
+                "value": "application/vnd.github+json"
+              },
+              {
+                "name": "X-GitHub-Api-Version",
+                "value": "2022-11-28"
+              },
+              {
+                "name": "User-Agent",
+                "value": "n8n-backup"
+              }
+            ]
+          },
+          "options": {
+            "response": {
+              "response": {
+                "neverError": true
+              }
+            }
+          }
+        },
+        "credentials": {
+          "githubApi": {
+            "id": "eBVkFpyweKY4ZBJT",
+            "name": "GitHub account"
+          }
+        }
+      },
+      {
+        "id": "g6",
+        "name": "변경 여부 확인",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          1120,
+          100
+        ],
+        "parameters": {
+          "mode": "runOnceForAllItems",
+          "jsCode": "const files = $('파일 생성').all();\nconst out = [];\n$input.all().forEach((r, i) => {\n  const f = files[i].json;\n  const ex = r.json;\n  const exists = !!(ex && ex.sha && ex.content);\n  if (exists && String(ex.content).replace(/\\n/g, '') === f.content) return; // 변경 없음 → 스킵\n  // branch 미지정 = 기본 브랜치 (빈 저장소에서도 동작)\n  const body = {\n    message: `backup: ${f.name} (${new Date().toISOString().slice(0, 10)})`,\n    content: f.content\n  };\n  if (exists) body.sha = ex.sha;\n  out.push({ json: { path: f.path, body } });\n});\nreturn out;"
+        }
+      },
+      {
+        "id": "g7",
+        "name": "GitHub 파일 저장",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          1340,
+          100
+        ],
+        "parameters": {
+          "method": "PUT",
+          "url": "=https://api.github.com/repos/{{ $('설정').first().json.owner }}/{{ $('설정').first().json.repo }}/contents/{{ $json.path }}",
+          "authentication": "predefinedCredentialType",
+          "nodeCredentialType": "githubApi",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "Accept",
+                "value": "application/vnd.github+json"
+              },
+              {
+                "name": "X-GitHub-Api-Version",
+                "value": "2022-11-28"
+              },
+              {
+                "name": "User-Agent",
+                "value": "n8n-backup"
+              }
+            ]
+          },
+          "sendBody": true,
+          "contentType": "json",
+          "specifyBody": "json",
+          "jsonBody": "={{ JSON.stringify($json.body) }}",
+          "options": {}
+        },
+        "credentials": {
+          "githubApi": {
+            "id": "eBVkFpyweKY4ZBJT",
+            "name": "GitHub account"
+          }
+        }
+      }
+    ],
+    "connections": {
+      "매일 오후 5시": {
+        "main": [
+          [
+            {
+              "node": "설정",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "수동 실행 웹훅": {
+        "main": [
+          [
+            {
+              "node": "설정",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "설정": {
+        "main": [
+          [
+            {
+              "node": "n8n 워크플로우 전체 조회",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "n8n 워크플로우 전체 조회": {
+        "main": [
+          [
+            {
+              "node": "파일 생성",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "파일 생성": {
+        "main": [
+          [
+            {
+              "node": "GitHub 기존 파일 조회",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "GitHub 기존 파일 조회": {
+        "main": [
+          [
+            {
+              "node": "변경 여부 확인",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "변경 여부 확인": {
+        "main": [
+          [
+            {
+              "node": "GitHub 파일 저장",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "nodeGroups": [],
+    "authors": "연지 최",
+    "name": null,
+    "description": null,
+    "autosaved": false,
+    "createdAt": "2026-11-09T12:27:57.903Z",
+    "updatedAt": "2026-11-09T12:27:57.903Z"
+  }
+}
